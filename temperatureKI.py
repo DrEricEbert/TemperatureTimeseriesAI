@@ -136,7 +136,15 @@ class MainWindow(QMainWindow):
         anomaly_menu = menu.addMenu("Anomalieerkennung")
         anomaly_action = anomaly_menu.addAction("Anomalien finden")
         anomaly_action.triggered.connect(self.anomaly_detection)
-    
+        
+        # Menü Modell
+        model_menu = menu.addMenu("Modell")
+        save_model_action = model_menu.addAction("Modell speichern")
+        save_model_action.triggered.connect(self.save_model)
+        load_model_action = model_menu.addAction("Modell laden")
+        load_model_action.triggered.connect(self.load_model)   
+
+
     def show_info(self):
         QMessageBox.information(
             self,
@@ -176,7 +184,7 @@ class MainWindow(QMainWindow):
         optimizer = optim.Adam(self.model.parameters(), lr=0.01)
 
         # Training
-        epochs = 300
+        epochs = 30
         self.status.information(self, "Training", "Training startet...")
         for epoch in range(1, epochs + 1):
             self.model.train()
@@ -306,7 +314,38 @@ class MainWindow(QMainWindow):
         plot_win = PlotWindow("Anomalieerkennung")
         anomaly_values = temperatures[anomaly_indices] if anomaly_indices.size > 0 else None
         plot_win.plot_data(x, temperatures, anomalies=anomaly_values, anomaly_indices=anomaly_indices, title="Anomalien in der Temperaturreihe")
-        
+
+
+    def save_model(self):
+        """Speichert das aktuelle Modell in einer Datei."""
+        if self.model is None:
+            QMessageBox.warning(self, "Warnung", "Es gibt kein Modell, das gespeichert werden könnte!")
+            return
+
+       # options = QFileDialog.Options()
+        fileName, _ = QFileDialog.getSaveFileName(self, "Modell speichern", "model.pt", "PyTorch Modelle (*.pt);;Alle Files (*)")#, options=options)
+        if not fileName:
+            return
+        try:
+            torch.save(self.model.state_dict(), fileName)
+            QMessageBox.information(self, "Modell speichern", f"Modell erfolgreich gespeichert: {fileName}")
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", f"Fehler beim Speichern des Modells: {e}")
+
+    def load_model(self):
+        """Lädt ein Modell aus einer Datei."""
+        #options = QFileDialog.Options()
+        fileName, _ = QFileDialog.getOpenFileName(self, "Modell laden", "", "PyTorch Modelle (*.pt);;Alle Files (*)")#, options=options)
+        if not fileName:
+            return
+        try:
+            # Erzeuge ein neues Modell (dieses sollte der gespeicherten Architektur entsprechen)
+            self.model = TemperatureNet(input_size=1, hidden_size=50, num_layers=1, output_size=1).to(self.device)
+            self.model.load_state_dict(torch.load(fileName, map_location=self.device))
+            self.model.eval()
+            QMessageBox.information(self, "Modell laden", f"Modell erfolgreich geladen: {fileName}")
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", f"Fehler beim Laden des Modells: {e}")        
 
 # ---------------------------
 # Main-Funktion
@@ -315,7 +354,7 @@ def main():
     # Optional: Beispieldaten erzeugen, falls nicht vorhanden
     if not os.path.exists("example_train.csv"):
         print("Erzeuge Beispieldaten 'example_train.csv'...")
-        generate_example_data(num_points=30000, noise_level=0.7, filename="example_train.csv")
+        generate_example_data(num_points=3000, noise_level=0.7, filename="example_train.csv")
     if not os.path.exists("example_test.csv"):
         print("Erzeuge Testdaten 'example_test.csv'...")
         generate_example_data(num_points=500, noise_level=2.5, filename="example_test.csv")
